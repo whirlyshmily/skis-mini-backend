@@ -1,0 +1,16 @@
+master:
+  push:
+    - stages:
+      - name: update code
+        image: cnbcool/ssh
+        settings:
+          host: 118.89.55.59
+          port: 22
+          username: root
+          password: 5A6W/F^P;esw:k
+          script: |
+            echo "update start"
+            cd /data/wwwroot/skis-mini-backend-test
+            git pull
+            ./build.sh
+            echo "update finish"

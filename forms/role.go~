@@ -1,0 +1,26 @@
+package forms
+
+import "skis-admin-backend/model"
+
+type CreateRoleRequest struct {
+	Name   string  `json:"name"`
+	Rights []int64 `json:"rights"`
+}
+
+type QueryRoleListRequest struct {
+	Keyword  string `form:"keyword"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"page_size"`
+	OrderBy  string `form:"order_by" binding:"oneof=id name"` //id name
+	Order    string `form:"order" binding:"oneof=desc asc"`    //desc asc
+}
+
+type QueryRoleListResponse struct {
+	List  []*model.Role `json:"list"`
+	Total int64         `json:"total"`
+}
+
+type QueryRoleInfoResponse struct {
+	*model.Role
+	Rights []*RightsResponse `json:"rights"`
+}
