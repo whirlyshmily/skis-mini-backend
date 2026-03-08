@@ -1,4 +1,3 @@
 .idea/*
 .vscode/*
 logs/log_*.log
-env.toml

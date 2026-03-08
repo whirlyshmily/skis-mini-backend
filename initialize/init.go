@@ -164,6 +164,13 @@ func InitCron() error {
 	}
 	fmt.Println("=================", clubJob)
 
+	// 订单课程教学状态重置任务：每天凌晨 2 点执行，将 teach_state=10(待教练确认用户预约) 的课程重置为 0(待预约)
+	ordersCoursesJob, err := c.AddJob("0 2 * * * ", cron2.OrdersCoursesJob{})
+	if err != nil {
+		return err
+	}
+	fmt.Println("=================", ordersCoursesJob)
+
 	// 启动调度器
 	c.Start()
 	return nil

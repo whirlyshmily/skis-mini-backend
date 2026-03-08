@@ -352,7 +352,8 @@ func ClubReplaceCoachCourse(c *gin.Context, orderCourseId string, req *forms.Clu
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
 		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
 			Updates(map[string]interface{}{
-				"teach_state": model.TeachStateWaitCoachConfirmTransfer,
+				"teach_state":    model.TeachStateWaitCoachConfirmTransfer,
+				"teach_coach_id": req.CoachId,
 			}).Error
 		if err != nil {
 			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")

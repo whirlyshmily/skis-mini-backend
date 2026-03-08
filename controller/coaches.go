@@ -452,6 +452,26 @@ func CoachApplyTransferOrders(c *gin.Context) {
 	response.Success(c, "转单申请成功，请联系俱乐部确认")
 	return
 }
+func CoachCancelApplyTransferOrders(c *gin.Context) {
+	orderCourseId := c.Param("order_course_id")
+	if orderCourseId == "" {
+		response.Err(c, enum.NewErr(enum.ParamErr, "订单课程ID不能为空"))
+		return
+	}
+	userType := c.GetInt("user_type")
+	if userType != model.UserTypeCoach {
+		response.Err(c, enum.NewErr(enum.UserTypeError, "用户类型错误"))
+		return
+	}
+	err := dao.CoachCancelApplyTransferOrders(c, orderCourseId)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.Success(c, "取消转单申请成功")
+	return
+
+}
 
 func CoachVerifyCourses(c *gin.Context) {
 	checkCode := c.Param("check_code")

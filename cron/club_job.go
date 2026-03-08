@@ -11,7 +11,7 @@ type ClubJob struct {
 
 func (m ClubJob) Run() {
 	var clubs []*model.Clubs
-	err := global.DB.Select("club_id").Where("verified=1 and state = 0").Find(&clubs).Error
+	err := global.DB.Table("club").Select("club_id").Where("verified=1 and state = 0").Find(&clubs).Error
 	if err != nil {
 		return
 	}

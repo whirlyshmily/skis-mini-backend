@@ -80,16 +80,20 @@ const (
 	OperateCoachAgreeClubCourse             = 331 //教练同意俱乐部课程
 	OperateCoachDisagreeClubCourse          = 332 //教练不同意俱乐部课程
 	OperateCoachApplyTransferCourse         = 340 //教练申请转单课程
-	OperateClubTransferToCoach              = 341 //俱乐部转移课程给教练
-	OperateCoachAgreeClubTransferToCoach    = 342 //教练同意俱乐部转单课程
-	OperateCoachDisagreeClubTransferToCoach = 343 //教练不同意俱乐部转单课程
+	OperateCoachCancelApplyTransferCourse   = 341 //教练取消申请转单课程
+	OperateClubTransferToCoach              = 345 //俱乐部转移课程给教练
+	OperateCoachAgreeClubTransferToCoach    = 346 //教练同意俱乐部转单课程
+	OperateCoachDisagreeClubTransferToCoach = 347 //教练不同意俱乐部转单课程
 
-	OperateCronCancelCourse                = 400 //定时任务取消课程
-	OperateCronCancelClubCourse            = 401 //定时任务取消俱乐部安排给教练的课程
-	OperateCronCancelCoachChangeCourse     = 402 //定时任务取消教练修改上课时间
-	OperateCronCancelClubChangeCourseTime  = 403 //定时任务取消俱乐部修改上课时间
-	OperateCronCancelCoachTransferCourse   = 404 //定时任务取消教练转单课程
-	OperateCronCancelTransferCourseToCoach = 405 //定时任务取消教练转单给其他教练的课程
+	OperateCronCancelCourse                   = 400 //定时任务取消课程
+	OperateCronCancelCoachChangeCourseTime    = 405 //待用户确认课程时，教练修改上课时间	定时任务（199）
+	OperateCronCancelClubCourse               = 410 //定时任务取消俱乐部安排给教练的课程
+	OperateCronCancelCoachChangeCourse        = 420 //定时任务取消教练修改上课时间
+	OperateCronCancelClubChangeCourseTime     = 430 //定时任务取消俱乐部修改上课时间
+	OperateCronCancelCoachTransferCourse      = 440 //定时任务取消教练转单课程
+	OperateCronCancelTransferCourseToCoach    = 450 //定时任务取消教练转单给其他教练的课程
+	OperateCronCancelClubTransferToCoach      = 460 //定时任务取消俱乐部转移课程给教练
+	OperateCronCancelCoachApplyTransferCourse = 470 //定时任务取消教练申请转单课程（340）
 
 	OperateCoachVerifyCourse = 500 //教练核销课程
 
@@ -100,49 +104,53 @@ const (
 )
 
 var OCSOperateStr = map[int]string{
-	OperateUserAppointment:                  "用户预约课程",
-	OperateUserCancelBeforeClubConfirm:      "用户在俱乐部未确认前取消",
-	OperateUserCancelBeforeCoachConfirm:     "用户在教练未确认前取消",
-	OperateUserCancelNoResponsibility:       "用户无责取消",
-	OperateUserCancelResponsibility:         "用户有责取消",
-	OperateCoachConfirmCourse:               "教练确认课程",
-	OperateCoachCancelCourse:                "教练取消课程",
-	OperateCoachVerifyCourse:                "教练核销课程",
-	OperateUserVerifyCourse:                 "用户核销课程",
-	OperateCoachChangeCourseTime:            "待用户确认课程时，教练修改上课时间",
-	OperateCoachChangeCourse:                "待上课，教练修改上课时间",
-	OperateUserAgreeChangeTimeBeforeC:       "用户同意教练确认预约之前修改的上课时间",
-	OperateUserDisagreeChangeTimeBeforeC:    "用户不同意教练确认预约之前修改上的课时间",
-	OperateUserAgreeCoachChangeCourse:       "用户同意教练修改上课时间",
-	OperateUserDisagreeCoachChangeCourse:    "用户不同意教练修改上课时间",
-	OperateCoachTransferCourse:              "教练向用户申请转单课程",
-	OperateUserAgreeCoachTransferCourse:     "用户同意教练转单课程",
-	OperateUserDisagreeCoachTransferCourse:  "用户不同意教练转单课程",
-	OperateCoachTransferToCoach:             "教练转单课程给其他教练",
-	OperateCoachAgreeTransferCourse:         "教练同意转单课程",
-	OperateCoachDisagreeTransferCourse:      "教练不同意转单课程",
-	OperateClubChangeUserCourseTime:         "俱乐部修改上课时间",
-	OperateUserAgreeClubChangeCourseTime:    "用户同意俱乐部修改上课时间",
-	OperateUserDisagreeClubChangeCourseTime: "用户不同意俱乐部修改上课时间",
-	OperateClubAppointCoach:                 "俱乐部安排教练上课",
-	OperateCoachAgreeClubCourse:             "教练同意俱乐部课程",
-	OperateCoachDisagreeClubCourse:          "教练不同意俱乐部课程",
-	OperateCoachCancelCourseTransfer:        "教练取消转单课程",
-	OperateCoachCancelBeforeCoachConfirm:    "教练在教练未确认前取消",
-	OperateCoachCancelNoResponsibility:      "教练无责取消",
-	OperateCoachApplyTransferCourse:         "教练申请转单课程",
-	OperateClubTransferToCoach:              "俱乐部转移课程给教练",
-	OperateCoachAgreeClubTransferToCoach:    "教练同意俱乐部转单课程",
-	OperateCoachDisagreeClubTransferToCoach: "教练不同意俱乐部转单课程",
-	OperateCronCancelCourse:                 "定时任务取消课程",
-	OperateCronCancelClubCourse:             "定时任务取消俱乐部安排给教练的课程",
-	OperateCronCancelCoachChangeCourse:      "定时任务取消教练修改上课时间",
-	OperateCronCancelClubChangeCourseTime:   "定时任务取消俱乐部修改上课时间",
-	OperateCronCancelCoachTransferCourse:    "定时任务取消教练转单课程",
-	OperateCronCancelTransferCourseToCoach:  "定时任务取消教练转单给其他教练的课程",
-	OperateCronVerifyCourse:                 "定时任务核销课程",
-	OperateUserCancelCourse:                 "用户退课",
-	OperateAdminOrderTransfer:               "管理台转单",
+	OperateUserAppointment:                    "用户预约课程",
+	OperateUserCancelBeforeClubConfirm:        "用户在俱乐部未确认前取消",
+	OperateUserCancelBeforeCoachConfirm:       "用户在教练未确认前取消",
+	OperateUserCancelNoResponsibility:         "用户无责取消",
+	OperateUserCancelResponsibility:           "用户有责取消",
+	OperateCoachConfirmCourse:                 "教练确认课程",
+	OperateCoachCancelCourse:                  "教练取消课程",
+	OperateCoachVerifyCourse:                  "教练核销课程",
+	OperateUserVerifyCourse:                   "用户核销课程",
+	OperateCoachChangeCourseTime:              "待用户确认课程时，教练修改上课时间",
+	OperateCoachChangeCourse:                  "待上课，教练修改上课时间",
+	OperateUserAgreeChangeTimeBeforeC:         "用户同意教练确认预约之前修改的上课时间",
+	OperateUserDisagreeChangeTimeBeforeC:      "用户不同意教练确认预约之前修改上的课时间",
+	OperateUserAgreeCoachChangeCourse:         "用户同意教练修改上课时间",
+	OperateUserDisagreeCoachChangeCourse:      "用户不同意教练修改上课时间",
+	OperateCoachTransferCourse:                "教练向用户申请转单课程",
+	OperateUserAgreeCoachTransferCourse:       "用户同意教练转单课程",
+	OperateUserDisagreeCoachTransferCourse:    "用户不同意教练转单课程",
+	OperateCoachTransferToCoach:               "教练转单课程给其他教练",
+	OperateCoachAgreeTransferCourse:           "教练同意转单课程",
+	OperateCoachDisagreeTransferCourse:        "教练不同意转单课程",
+	OperateClubChangeUserCourseTime:           "俱乐部修改上课时间",
+	OperateUserAgreeClubChangeCourseTime:      "用户同意俱乐部修改上课时间",
+	OperateUserDisagreeClubChangeCourseTime:   "用户不同意俱乐部修改上课时间",
+	OperateClubAppointCoach:                   "俱乐部安排教练上课",
+	OperateCoachAgreeClubCourse:               "教练同意俱乐部课程",
+	OperateCoachDisagreeClubCourse:            "教练不同意俱乐部课程",
+	OperateCoachCancelCourseTransfer:          "教练取消转单课程",
+	OperateCoachCancelBeforeCoachConfirm:      "教练在教练未确认前取消",
+	OperateCoachCancelNoResponsibility:        "教练无责取消",
+	OperateCoachApplyTransferCourse:           "教练申请转单课程",
+	OperateCoachCancelApplyTransferCourse:     "教练取消申请转单课程",
+	OperateClubTransferToCoach:                "俱乐部转移课程给教练",
+	OperateCoachAgreeClubTransferToCoach:      "教练同意俱乐部转单课程",
+	OperateCoachDisagreeClubTransferToCoach:   "教练不同意俱乐部转单课程",
+	OperateCronCancelCourse:                   "定时任务取消课程",
+	OperateCronCancelCoachChangeCourseTime:    "定时任务取消教练修改上课时间（未确认上课）",
+	OperateCronCancelClubCourse:               "定时任务取消俱乐部安排给教练的课程",
+	OperateCronCancelCoachChangeCourse:        "定时任务取消教练修改上课时间",
+	OperateCronCancelClubChangeCourseTime:     "定时任务取消俱乐部修改上课时间",
+	OperateCronCancelCoachTransferCourse:      "定时任务取消教练转单课程",
+	OperateCronCancelTransferCourseToCoach:    "定时任务取消教练转单给其他教练的课程",
+	OperateCronCancelClubTransferToCoach:      "定时任务取消俱乐部转移课程给教练",
+	OperateCronCancelCoachApplyTransferCourse: "定时任务取消教练申请转单课程",
+	OperateCronVerifyCourse:                   "定时任务核销课程",
+	OperateUserCancelCourse:                   "用户退课",
+	OperateAdminOrderTransfer:                 "管理台转单",
 }
 
 const (

@@ -715,6 +715,7 @@ func CoachTransferOrderToCoach(c *gin.Context, req *forms.CoachTransferOrderToCo
 
 func CoachReviewOrderFromCoach(c *gin.Context, req *forms.CoachReviewOrderFromCoachRequest) (err error) {
 	userId := c.GetString("user_id")
+	coachId := c.GetString("coach_id")
 	//userId := "C20250823181716sjfsfji" //TODO: 临时测试
 	userType := c.GetInt("user_type")
 
@@ -807,7 +808,7 @@ func CoachReviewOrderFromCoach(c *gin.Context, req *forms.CoachReviewOrderFromCo
 			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", req.OrderCourseId).
 				Updates(map[string]interface{}{
 					"teach_state":    model.TeachStateWaitClassTransfer,
-					"teach_coach_id": userId,
+					"teach_coach_id": coachId,
 					"teach_time_ids": string(idsStr),
 				}).Error
 			if err != nil {
@@ -889,8 +890,8 @@ func CancelOrderFromCoachSql(c context.Context, inspectorate model.OrdersCourses
 			return enum.NewErr(enum.OrdersCoursesExitErr, "添加拒绝转单记录失败")
 		}
 
-		err = tx.Model(model.OrdersCoursesState{}).Where("id = ? and operate=? and process=?",
-			ocs.ID, model.OperateCoachTransferToCoach, model.ProcessNo).
+		err = tx.Model(model.OrdersCoursesState{}).Where("id = ? and process=?",
+			ocs.ID, model.ProcessNo).
 			Updates(map[string]interface{}{
 				"process": model.ProcessYes,
 			}).Error
@@ -913,6 +914,7 @@ func CancelOrderFromCoachSql(c context.Context, inspectorate model.OrdersCourses
 func CoachReviewOrderFromClub(c *gin.Context, req *forms.CoachReviewOrderFromClubRequest) (err error) {
 	userId := c.GetString("user_id")
 	userType := c.GetInt("user_type")
+	coachId := c.GetString("coach_id")
 	if userType != model.UserTypeCoach {
 		return enum.NewErr(enum.OrdersCoursesExitErr, "您不是教练，无法进行该操作")
 	}
@@ -991,6 +993,7 @@ func CoachReviewOrderFromClub(c *gin.Context, req *forms.CoachReviewOrderFromClu
 				OrderCourseID: orderCourse.OrderCourseID,
 				UserID:        userId,
 				UserType:      userType,
+				CoachID:       coachId,
 				Operate:       model.OperateCoachAgreeClubCourse,
 				Remark:        model.OCSOperateStr[model.OperateCoachAgreeClubCourse],
 				Process:       model.ProcessYes,
@@ -1004,7 +1007,7 @@ func CoachReviewOrderFromClub(c *gin.Context, req *forms.CoachReviewOrderFromClu
 			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", req.OrderCourseId).
 				Updates(map[string]interface{}{
 					"teach_state":       model.TeachStateWaitCoachClass,
-					"teach_coach_id":    userId,
+					"teach_coach_id":    coachId,
 					"teach_time_ids":    string(idsStr),
 					"teach_buffer_time": req.BufferTime,
 				}).Error
@@ -1176,7 +1179,6 @@ func CoachReviewReplaceFromClub(c *gin.Context, req *forms.CoachReviewReplaceFro
 			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", req.OrderCourseId).
 				Updates(map[string]interface{}{
 					"teach_state":    model.TeachStateWaitCoachClass,
-					"teach_coach_id": userId,
 					"teach_time_ids": string(idsStr),
 				}).Error
 			if err != nil {
@@ -1209,6 +1211,13 @@ func CoachReviewReplaceFromClub(c *gin.Context, req *forms.CoachReviewReplaceFro
 			return nil
 		})
 	} else { //教练拒绝接单
+		lastOrderCourseState := model.OrdersCoursesState{}
+		err = global.DB.Model(model.OrdersCoursesState{}).Where("order_course_id = ? and operate in ? ",
+			orderCourse.OrderCourseID, []int{model.OperateCoachAgreeClubCourse, model.OperateCoachAgreeClubTransferToCoach}).Last(&lastOrderCourseState).Error
+		if err != nil {
+			return enum.NewErr(enum.OrdersCoursesExitErr, "找不到之前的教练")
+		}
+
 		err = global.DB.Transaction(func(tx *gorm.DB) error {
 			inspectorate := model.OrdersCoursesState{
 				OrderCourseID: orderCourse.OrderCourseID,
@@ -1231,7 +1240,8 @@ func CoachReviewReplaceFromClub(c *gin.Context, req *forms.CoachReviewReplaceFro
 			}
 			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", req.OrderCourseId).
 				Updates(map[string]interface{}{
-					"teach_state": model.TeachStateCoachApplyTransfer,
+					"teach_state":    model.TeachStateCoachApplyTransfer,
+					"teach_coach_id": lastOrderCourseState.CoachID,
 				}).Error
 			if err != nil {
 				return enum.NewErr(enum.OrdersCoursesExitErr, "课程状态修改失败")
@@ -1304,6 +1314,66 @@ func CoachApplyTransferOrders(c *gin.Context, orderCourseId string) (err error) 
 	})
 	return nil
 }
+
+func CoachCancelApplyTransferOrders(c *gin.Context, orderCourseId string) (err error) {
+	userId := c.GetString("user_id")
+	userType := c.GetInt("user_type")
+	order, orderCourse, err := GetOrderCourses(orderCourseId)
+	if err != nil {
+		return err
+	}
+	if orderCourse.TeachCoachID != userId {
+		return enum.NewErr(enum.OrdersCoursesExitErr, "不是您分配的课程")
+	}
+	if order.UserType != model.UserTypeClub {
+		return enum.NewErr(enum.OrdersCoursesExitErr, "非俱乐部订单")
+	}
+	if orderCourse.IsCheck == model.IsCheckYes {
+		return enum.NewErr(enum.OrdersCoursesExitErr, "课程已核销")
+	}
+	if orderCourse.TeachState != model.TeachStateCoachApplyTransfer {
+		return enum.NewErr(enum.OrdersCoursesExitErr, "该课程不是教练申请转单状态，不能取消转单")
+	}
+
+	err = global.DB.Transaction(func(tx *gorm.DB) error {
+		err = tx.Model(model.OrdersCoursesState{}).Where("order_course_id = ? and operate=? and process=?",
+			orderCourse.OrderCourseID, model.OperateCoachApplyTransferCourse, model.ProcessNo).
+			Updates(map[string]interface{}{
+				"process": model.ProcessYes,
+			}).Error
+		if err != nil {
+			global.Lg.Error("取消转单记录修改失败", zap.Error(err))
+			return enum.NewErr(enum.OrdersCoursesExitErr, "取消转单记录修改失败")
+		}
+		inspectorate := model.OrdersCoursesState{
+			OrderCourseID: orderCourse.OrderCourseID,
+			UserID:        userId,
+			UserType:      userType,
+			Operate:       model.OperateCoachCancelApplyTransferCourse,
+			Remark:        model.OCSOperateStr[model.OperateCoachCancelApplyTransferCourse],
+			Process:       model.ProcessYes,
+		}
+		err = tx.Model(model.OrdersCoursesState{}).Create(&inspectorate).Error
+		if err != nil {
+			global.Lg.Error("取消转单记录添加失败", zap.Error(err))
+			return enum.NewErr(enum.OrdersCoursesExitErr, "取消转单记录添加失败")
+		}
+		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
+			Updates(map[string]interface{}{
+				"teach_state": model.TeachStateWaitCoachClass,
+			}).Error
+		if err != nil {
+			return enum.NewErr(enum.OrdersCoursesExitErr, "取消转单失败")
+		}
+		return nil
+	})
+	if err != nil {
+		global.Lg.Error("取消转单失败", zap.Error(err), zap.Any("orderCourseId", orderCourseId))
+		return err
+	}
+	return err
+}
+
 func CoachVerifyCourses(c *gin.Context, checkCode string) (err error) {
 	coachId := c.GetString("coach_id")
 	orderCourse := model.OrdersCourses{}

@@ -168,9 +168,10 @@ func CoachesRouter(Router *gin.RouterGroup) {
 		RouteRouter.POST("/transfer_order_to_coach", middlewares.JWTAuth(), controller.CoachTransferOrderToCoach)                                //转单给教练
 		RouteRouter.POST("/review_order_from_coach", middlewares.JWTAuth(), controller.CoachReviewOrderFromCoach)                                //教练审核其他教练转过来的课程
 
-		RouteRouter.POST("/review_order_from_club", middlewares.JWTAuth(), controller.CoachReviewOrderFromClub)                //教练审核俱乐部转过来的课程
-		RouteRouter.POST("/apply_transfer_order/:order_course_id", middlewares.JWTAuth(), controller.CoachApplyTransferOrders) //教练申请转单（待俱乐部审核）
-		RouteRouter.POST("/review_replace_from_club", middlewares.JWTAuth(), controller.CoachReviewReplaceFromClub)            //教练审核俱乐部更换教练的课程
+		RouteRouter.POST("/review_order_from_club", middlewares.JWTAuth(), controller.CoachReviewOrderFromClub)                             //教练审核俱乐部转过来的课程
+		RouteRouter.POST("/apply_transfer_order/:order_course_id", middlewares.JWTAuth(), controller.CoachApplyTransferOrders)              //教练申请转单（待俱乐部审核）
+		RouteRouter.POST("/cancel_apply_transfer_order/:order_course_id", middlewares.JWTAuth(), controller.CoachCancelApplyTransferOrders) //教练取消申请转单（待俱乐部审核）
+		RouteRouter.POST("/review_replace_from_club", middlewares.JWTAuth(), controller.CoachReviewReplaceFromClub)                         //教练审核俱乐部更换教练的课程
 
 		RouteRouter.POST("/verify_order_course/:check_code", middlewares.JWTAuth(), controller.CoachVerifyCourses) //教练核销课程
 
