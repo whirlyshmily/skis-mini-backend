@@ -76,7 +76,7 @@ func QueryMatchCoachesList(c *gin.Context, req forms.QueryMatchCoachesListReques
 	orderCourse := model.OrdersCourses{}
 	userId := c.GetString("user_id")
 	err = global.DB.Model(&model.OrdersCourses{}).Preload("CourseTags", "state = 0").
-		Where("order_course_id = ?", req.OrderCourseId).First(&orderCourse).Error
+		Where("order_course_id = ? and state=0", req.OrderCourseId).First(&orderCourse).Error
 	if err != nil {
 		global.Lg.Error("QueryMatchCoachesList 查询订单课程失败", zap.Error(err))
 		err = enum.NewErr(enum.OrdersCoursesExitErr, "订单课程不存在")

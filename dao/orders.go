@@ -51,6 +51,10 @@ func CreateOrder(c *gin.Context, uid, openId string, req *forms.CreateOrderReque
 	}
 	totalFee := good.DiscountMoney
 	user, err := QueryUserInfo(uid)
+	if err != nil {
+		global.Lg.Error("QueryUserInfo error", zap.Error(err))
+		return nil, err
+	}
 	var leftPoints int64
 	if usePoints > 0 {
 		usePoints = totalFee
@@ -62,8 +66,6 @@ func CreateOrder(c *gin.Context, uid, openId string, req *forms.CreateOrderReque
 		leftPoints = user.LeftPoints
 		if usePoints > leftPoints {
 			usePoints = leftPoints
-			//global.Lg.Error("use credits error", zap.Error(err))
-			//return nil, enum.NewErr(enum.UserCreditsErr, "积分不足")
 		}
 	}
 	paidFee := totalFee - usePoints //积分1:1抵扣
