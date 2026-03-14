@@ -402,6 +402,9 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 	if consumeFee > order.PaidFee {
 		refundMoney.Money = 0
 		refundMoney.UsedPoints = order.PaidFee + order.UsedPoints - consumeFee
+		if refundMoney.UsedPoints < 0 {
+			refundMoney.UsedPoints = 0
+		}
 	} else {
 		refundMoney.Money = order.PaidFee - consumeFee
 		refundMoney.UsedPoints = order.UsedPoints
