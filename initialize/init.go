@@ -134,11 +134,11 @@ func InitCron() error {
 	c := cron.New()
 
 	// 添加一个自定义任务
-	job, err := c.AddJob("@every 1m", cron2.MyJob{})
-	if err != nil {
-		return err
-	}
-	fmt.Println("=================", job)
+	//job, err := c.AddJob("@every 1m", cron2.MyJob{})
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Println("=================", job)
 
 	orderCourseJob, err := c.AddJob("@every 5m", cron2.OrdersCoursesStateJob{})
 	if err != nil {

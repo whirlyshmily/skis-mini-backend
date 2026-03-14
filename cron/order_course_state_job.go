@@ -17,7 +17,7 @@ func (m OrdersCoursesStateJob) Run() {
 	c := context.Background()
 	var data48 []model.OrdersCoursesState
 	global.DB.Model(model.OrdersCoursesState{}).
-		//Where("created_at between now() - interval 3 day and now() - interval 2 day").
+		Where("created_at between now() - interval 30 day and now() - interval 2 day").
 		Where("operate in ? and process = ?", []model.TeachState{model.OperateUserAgreeCoachTransferCourse, model.OperateCoachApplyTransferCourse}, model.ProcessNo).
 		Find(&data48)
 
@@ -32,29 +32,10 @@ func (m OrdersCoursesStateJob) Run() {
 		}
 
 		if ocs.Operate == model.OperateCoachApplyTransferCourse { //教练申请转让课程，用户没确认转让，2天后自动取消
-			/*ocsCancel := model.OrdersCoursesState{}
-			fmt.Println("888", ocs.OrderCourseID, model.OperateClubTransferToCoach, model.ProcessNo)
-			err = global.DB.Model(model.OrdersCoursesState{}).
-				Where("order_course_id = ? and operate = ? and process = ?", ocs.OrderCourseID, model.OperateClubTransferToCoach, model.ProcessNo).
-				First(&ocsCancel).Error
-			if err != nil {
-				fmt.Println("---", err)
-			}
-
-			fmt.Println("666")
-			if ocsCancel.ID != 0 {
-				_, orderCourseCancel, err1 := dao.GetOrderCourses(ocsCancel.OrderCourseID)
-				if err1 == nil {
-					cronCancelClubTransferToCoach(c, orderCourseCancel, ocsCancel)
-				}
-			}
-			fmt.Println("====")
-			return*/
 			cronCancelCoachApplyTransferOrder(c, orderCourse, ocs)
 		}
 	}
 
-	return
 	var data []model.OrdersCoursesState
 	global.DB.Model(model.OrdersCoursesState{}).
 		Where("created_at between now() - interval 2 day and now() - interval 1 day").
