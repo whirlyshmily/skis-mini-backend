@@ -521,8 +521,8 @@ func OrdersRefundCallback(c *gin.Context, result *RefundCallbackResult) error {
 
 		//插入资金流水记录
 		mr := model.MoneyRecords{
-			UserID:       order.UserID,
-			UserType:     1,
+			UserID:       order.Uid,
+			UserType:     model.UserTypeUser,
 			Money:        refund.RefundMoney,
 			MoneyType:    model.UserIncomeRefundNoFault,
 			IncomeType:   model.IncomeTypePay,
