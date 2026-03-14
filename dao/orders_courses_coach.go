@@ -1385,7 +1385,7 @@ func CoachVerifyCourses(c *gin.Context, checkCode string) (err error) {
 	if orderCourse.TeachState == model.TeachStateWaitCoachConfirmUser {
 		return enum.NewErr(enum.OrdersCoursesExitErr, "先确认课程")
 	}
-	if orderCourse.TeachState != model.TeachStateWaitClass && orderCourse.TeachState != model.TeachStateWaitCheck && orderCourse.TeachState != model.TeachStateWaitCoachClass {
+	if orderCourse.TeachState != model.TeachStateWaitClassTransfer && orderCourse.TeachState != model.TeachStateWaitClass && orderCourse.TeachState != model.TeachStateWaitCheck && orderCourse.TeachState != model.TeachStateWaitCoachClass {
 		return enum.NewErr(enum.OrdersCoursesExitErr, "课程状态错误")
 	}
 

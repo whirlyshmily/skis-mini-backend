@@ -326,8 +326,8 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 				OrderCourseId: ordersCourses[0].OrderCourseID,
 				Money:         ordersCourses[0].FaultMoney,
 			}
+			serviceRatio := enum.ServiceRatio
 			consumeFee = one.Money
-			one.ServiceMoney = one.Money * enum.ServiceRatio / 100
 			if order.UserType == model.UserTypeCoach { //教练课程
 				one.UserType = model.UserTypeCoach
 				one.UserId = order.UserID
@@ -335,6 +335,10 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 				if order.TransferCoachID != "" && order.TransferFee > 0 { //转课
 					one.UserId = order.TransferCoachID
 					one.MoneyType = model.CoachIncomeOneCTranferRefundFault
+				}
+				coach, err := QueryCoachInfo(order.UserID)
+				if err == nil && coach != nil {
+					serviceRatio = coach.ServiceRate
 				}
 			}
 			if order.UserType == model.UserTypeClub { //俱乐部课程，有责取消费用给教练
@@ -345,6 +349,7 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 				}
 			}
 			refundMoney.RefundData = append(refundMoney.RefundData, one)
+			one.ServiceMoney = one.Money * int64(serviceRatio) / 100
 		}
 	} else { //打包课
 		for _, ordersCourse := range ordersCourses {
@@ -354,6 +359,11 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 			if ordersCourse.TeachState != model.TeachStateFinish { //已核销的课程才需要补钱
 				continue
 			}
+			serviceRatio := enum.ServiceRatio
+			coach, err := QueryCoachInfo(ordersCourse.TeachCoachID)
+			if err == nil && coach != nil {
+				serviceRatio = coach.ServiceRate
+			}
 			coachMoney := (ordersCourse.TeachMoney + ordersCourse.AreaMoney) * int64(100-order.Discount) / 100
 			consumeFee += ordersCourse.TeachMoney + ordersCourse.AreaMoney
 			re := CoachClubRefundData{
@@ -361,7 +371,7 @@ func GetRefundMoney(order model.Orders, ordersCourses []model.OrdersCourses) (re
 				UserType:         model.UserTypeCoach,
 				Money:            coachMoney,
 				MoneyType:        model.CoachIncomePackCRefundFinishToCoach,
-				ServiceMoney:     coachMoney * enum.ServiceRatio / 100,
+				ServiceMoney:     coachMoney * int64(serviceRatio) / 100,
 				ServiceMoneyType: model.CoachPayPackCRefundFinishToCoachService,
 			}
 			if order.UserType == model.UserTypeClub { //俱乐部课程

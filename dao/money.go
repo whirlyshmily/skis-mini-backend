@@ -183,8 +183,29 @@ func ImproveVerifyData(c context.Context, db *gorm.DB, verifyData *VerifyCourseD
 	err = db.Model(&model.ReferralRecords{}).
 		Where("user_id = ? and referral_user_id=? and referral_type=? and state = 0",
 			verifyData.Uid, verifyData.Seller.UserId, verifyData.Seller.UserType).Last(&uidReferralRecord).Error
+	var sellerServiceRatio, teacherServiceRatio, transferServiceRatio int64
+	sellerServiceRatio, teacherServiceRatio, transferServiceRatio = enum.ServiceRatio, enum.ServiceRatio, enum.ServiceRatio
+	if verifyData.Seller.UserType == model.UserTypeCoach {
+		coach, err := QueryCoachInfo(verifyData.Seller.UserId)
+		if err == nil && coach != nil {
+			sellerServiceRatio = int64(coach.ServiceRate)
+		}
+	}
+	if verifyData.Teacher.UserType == model.UserTypeCoach {
+		coach, err := QueryCoachInfo(verifyData.Teacher.UserId)
+		if err == nil && coach != nil {
+			teacherServiceRatio = int64(coach.ServiceRate)
+		}
+	}
+	if verifyData.Transfer.UserType == model.UserTypeCoach {
+		coach, err := QueryCoachInfo(verifyData.Transfer.UserId)
+		if err == nil && coach != nil {
+			transferServiceRatio = int64(coach.ServiceRate)
+		}
+	}
+
 	if err != nil || uidReferralRecord.ID == 0 { //购买课程的用户跟售卖课程的用户不是推荐关系，需要缴纳平台服务费
-		verifyData.Seller.ServiceMoney = verifyData.Seller.Money * enum.ServiceRatio / 100
+		verifyData.Seller.ServiceMoney = verifyData.Seller.Money * sellerServiceRatio / 100
 	}
 
 	if verifyData.Seller.ServiceMoney > 0 { //如果有服务费，平台就给售卖课程用户的推荐人返佣
@@ -193,20 +214,20 @@ func ImproveVerifyData(c context.Context, db *gorm.DB, verifyData *VerifyCourseD
 			Where("user_id = ? and user_type=? and state = 0",
 				verifyData.Seller.UserId, verifyData.Seller.UserType).Last(&sellUserReferralRecord).Error
 		if err == nil && sellUserReferralRecord.ID > 0 { //有服务费的情况下，售卖课程的用户有推荐人，平台需要给推荐人返佣
-			verifyData.Seller.ReferralMoney = verifyData.Seller.Money * enum.ReferralRatio / 100
+			verifyData.Seller.ReferralMoney = verifyData.Seller.Money * sellerServiceRatio / 100
 			verifyData.Seller.ReferralUserId = sellUserReferralRecord.ReferralUserID
 			verifyData.Seller.ReferralUserType = sellUserReferralRecord.ReferralType
 		}
 	}
 	if verifyData.Teacher.Money > 0 { //如果教学金额大于0，说明有教学费用，需要缴纳平台服务费
-		verifyData.Teacher.ServiceMoney = verifyData.Teacher.Money * enum.ServiceRatio / 100
+		verifyData.Teacher.ServiceMoney = verifyData.Teacher.Money * teacherServiceRatio / 100
 		if verifyData.Teacher.ServiceMoney > 0 { //如果有服务费，平台就给教学课程用户的推荐人返佣
 			teachUserReferralRecord := &model.ReferralRecords{}
 			err = db.Model(&model.ReferralRecords{}).
 				Where("user_id = ? and user_type=? and state = 0",
 					verifyData.Teacher.UserId, verifyData.Teacher.UserType).Last(&teachUserReferralRecord).Error
 			if err == nil && teachUserReferralRecord.ID > 0 { //有服务费的情况下，教学课程的用户有推荐人，平台需要给推荐人返佣
-				verifyData.Teacher.ReferralMoney = verifyData.Teacher.Money * enum.ReferralRatio / 100
+				verifyData.Teacher.ReferralMoney = verifyData.Teacher.Money * teacherServiceRatio / 100
 				verifyData.Teacher.ReferralUserId = teachUserReferralRecord.ReferralUserID
 				verifyData.Teacher.ReferralUserType = teachUserReferralRecord.ReferralType
 			}
@@ -214,14 +235,14 @@ func ImproveVerifyData(c context.Context, db *gorm.DB, verifyData *VerifyCourseD
 	}
 
 	if verifyData.Transfer.Money > 0 { //如果转单金额大于0，说明有转单费用，需要缴纳平台服务费
-		verifyData.Transfer.ServiceMoney = verifyData.Transfer.Money * enum.ServiceRatio / 100
+		verifyData.Transfer.ServiceMoney = verifyData.Transfer.Money * transferServiceRatio / 100
 		if verifyData.Transfer.ServiceMoney > 0 { //如果有服务费，平台就给转单课程用户的推荐人返佣
 			transferUserReferralRecord := &model.ReferralRecords{}
 			err = db.Model(&model.ReferralRecords{}).
 				Where("user_id = ? and user_type=? and state = 0",
 					verifyData.Transfer.UserId, verifyData.Transfer.UserType).Last(&transferUserReferralRecord).Error
 			if err == nil && transferUserReferralRecord.ID > 0 { //有服务费的情况下，转单课程的用户有推荐人，平台需要给推荐人返佣
-				verifyData.Transfer.ReferralMoney = verifyData.Transfer.Money * enum.ReferralRatio / 100
+				verifyData.Transfer.ReferralMoney = verifyData.Transfer.Money * transferServiceRatio / 100
 				verifyData.Transfer.ReferralUserId = transferUserReferralRecord.ReferralUserID
 				verifyData.Transfer.ReferralUserType = transferUserReferralRecord.ReferralType
 			}

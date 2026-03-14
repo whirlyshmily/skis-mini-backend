@@ -596,7 +596,6 @@ func ReviewCoachTeachTime(c *gin.Context, orderCourse *model.OrdersCourses, orde
 	if orderCourse.TeachState == model.TeachStateWaitUserSecondConfirmTime {
 		oldOperate = model.OperateCoachChangeCourseTime
 		newOperate = model.OperateUserAgreeChangeTimeBeforeC
-		teachState = model.TeachStateWaitCoachConfirmUser
 	}
 	userId := order.UserID
 	if orderCourse.TeachCoachID != "" {
