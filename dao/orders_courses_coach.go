@@ -34,6 +34,11 @@ func CoachConfirmOrderCourses(c *gin.Context, orderCourseId string, req *forms.C
 		return enum.NewErr(enum.OrdersCoursesExitErr, "该课程已确认")
 	}
 
+	// 检查上课时间是否已过期
+	if time.Now().After(time.Time(orderCourse.TeachStartTime)) {
+		return enum.NewErr(enum.OrdersCoursesExitErr, "课程已过期，无法确认")
+	}
+
 	var bufferTimeIds []int64 //查出缓冲时间对应的教练的课程时间表ID
 	bufferTimeCount := 0      //缓冲时间有几个30分钟
 	if req.BufferTime != 0 {  //设置了缓冲时间
@@ -143,6 +148,7 @@ func CoachConfirmOrderCourses(c *gin.Context, orderCourseId string, req *forms.C
 	}
 	return nil
 }
+
 func BeforeCoachChangeOrderCourseTime(c *gin.Context, orderCourseId string) (resp *forms.CoachCanChangeTimeResp) {
 	userId := c.GetString("user_id")
 	order, orderCourse, err := GetOrderCourses(orderCourseId)
