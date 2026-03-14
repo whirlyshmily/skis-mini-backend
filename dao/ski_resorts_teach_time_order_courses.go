@@ -1,6 +1,8 @@
 package dao
 
 import (
+	"skis-admin-backend/enum"
+
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"skis-admin-backend/global"
@@ -34,11 +36,15 @@ func SRTOrderCourses(tx *gorm.DB, skirtIds []int64, orderCourseId string, state 
 		err = tx.Table("ski_resorts_teach_time_order_courses").
 			Where("skirt_id in ? and order_course_id = ? and state = 0", skirtIds, orderCourseId).Update("state", 1).Error
 	} else { //预约课程，缓冲时间在外面处理
-		err = tx.Model(model.SkiResortsTeachTime{}).Where("id in ?", skirtIds).
-			Updates(map[string]interface{}{"teach_num": gorm.Expr("teach_num - ?", 1)}).Error
-		if err != nil {
-			global.Lg.Error("OrdersCoursesDao: SkiResortsTeachTime: %w", zap.Error(err), zap.Any("skirtIds", skirtIds), zap.Any("orderCourseId", orderCourseId))
-			return err
+		result := tx.Model(model.SkiResortsTeachTime{}).Where("id in ? and teach_num > 0", skirtIds).
+			Updates(map[string]interface{}{"teach_num": gorm.Expr("teach_num - ?", 1)})
+		if result.Error != nil {
+			global.Lg.Error("OrdersCoursesDao: SkiResortsTeachTime: %w", zap.Error(result.Error), zap.Any("skirtIds", skirtIds), zap.Any("orderCourseId", orderCourseId))
+			return result.Error
+		}
+		if result.RowsAffected != int64(len(skirtIds)) {
+			global.Lg.Error("OrdersCoursesDao: teach_num不足", zap.Any("skirtIds", skirtIds), zap.Any("orderCourseId", orderCourseId))
+			return enum.NewErr(enum.TeachTimeErr, "教学时间已被占用")
 		}
 
 		var sRTData []*model.SkiResortsTeachTimeOrderCourses
