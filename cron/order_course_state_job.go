@@ -490,7 +490,7 @@ func cronCancelCoachApplyTransferOrder(c context.Context, orderCourse model.Orde
 			return enum.NewErr(enum.OrdersCoursesExitErr, "状态更新失败")
 		}
 		// 更新订单课程状态回到教练申请转单前的状态
-		err = global.DB.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", orderCourse.OrderCourseID).
+		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", orderCourse.OrderCourseID).
 			Updates(map[string]interface{}{
 				"teach_state": model.TeachStateWaitCoachClass,
 			}).Error

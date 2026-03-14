@@ -53,34 +53,28 @@ func MoneyOperateWithdraw(c *gin.Context, req *forms.MoneyOperateWithdrawRequest
 	}
 	userId := c.GetString("user_id")
 
-	//查询用户当前提现中的总金额
+	if req.Money <= 0 {
+		return nil, enum.NewErr(enum.ParamErr, "提现金额必须大于 0")
+	}
+
 	op := model.MoneyOperate{}
 	global.DB.Model(&model.MoneyOperate{}).
-		Select("sum(money) as money").
+		Select("COALESCE(sum(money), 0) as money").
 		Where("user_id = ? and type = ? and status = ?", userId, req.Type, model.StatusWithdrawing).Scan(&op)
 
 	var courseMoney int64
-	if req.Type == model.TypeDeposit { //保证金提现时，要校验提现后的保证金是否大于最贵的课程金额
+	if req.Type == model.TypeDeposit {
 		course, _ := NewGoodsDao(c, global.DB).GetMaxPriceByUserId(userId)
 		courseMoney = course.TeachMoney + course.AreaMoney
 	}
 	var openid, userName, uid, appid string
-	if userType == enum.UserTypeCoach { //教练
+	if userType == enum.UserTypeCoach {
 		coach, err := CoachInfoByCoachId(userId)
 		if err != nil {
 			return nil, enum.NewErr(enum.CoachNotExistErr, "教练不存在")
 		}
 		if coach.FrozenDeposit == 1 {
 			return nil, enum.NewErr(enum.CoachFrozenDepositErr, "保证金被冻结")
-		}
-		if req.Type == model.TypeDeposit { //提现保证金
-			if coach.Deposit-op.Money-courseMoney < req.Money {
-				return nil, enum.NewErr(enum.CoachDepositNotEnoughErr, "保证金不足")
-			}
-		} else if req.Type == model.TypeBalance { //提现余额
-			if coach.Balance-op.Money < req.Money {
-				return nil, enum.NewErr(enum.CoachBalanceNotEnoughErr, "余额不足")
-			}
 		}
 		uid = coach.Uid
 		userName = coach.Realname
@@ -89,23 +83,97 @@ func MoneyOperateWithdraw(c *gin.Context, req *forms.MoneyOperateWithdrawRequest
 			return nil, err
 		}
 		openid = user.OpenId
+		if openid == "" {
+			return nil, enum.NewErr(enum.ParamErr, "请先绑定微信账号")
+		}
 		appid = global.Config.UserMiniProgram.AppId
-	} else if userType == enum.UserTypeClub { //俱乐部
+
+		operateID := GenerateId("M")
+		err = global.DB.Transaction(func(tx *gorm.DB) error {
+			if req.Type == model.TypeDeposit {
+				err = tx.Model(&model.Coaches{}).
+					Select("deposit").
+					Where("coach_id = ? AND deposit >= ?", userId, op.Money+courseMoney+req.Money).
+					First(&model.Coaches{}).Error
+				if err != nil {
+					return enum.NewErr(enum.CoachDepositNotEnoughErr, "保证金不足")
+				}
+			} else {
+				err = tx.Model(&model.Coaches{}).
+					Select("balance").
+					Where("coach_id = ? AND balance >= ?", userId, op.Money+req.Money).
+					First(&model.Coaches{}).Error
+				if err != nil {
+					return enum.NewErr(enum.CoachBalanceNotEnoughErr, "余额不足")
+				}
+			}
+
+			resp, err = Createtransferbill(c, operateID, appid, openid, userName, req.Money)
+			if err != nil {
+				global.Lg.Error("Createtransferbill err", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp))
+				return err
+			}
+
+			record := model.MoneyRecords{
+				UserID:        userId,
+				UserType:      userType,
+				Money:         req.Money,
+				MoneyType:     getWithdrawMoneyType(userType, req.Type),
+				IncomeType:    model.IncomeTypePay,
+				RelationType:  model.RelationTypeWithdraw,
+				RelationID:    operateID,
+				OrderCourseID: "",
+			}
+			err = NewMoneyRecordsDao(c, tx).Create(c, &record, tx)
+			if err != nil {
+				global.Lg.Error("提现失败，保存资金记录失败", zap.Error(err), zap.Any("req", req))
+				return err
+			}
+
+			operateData := model.MoneyOperate{
+				OperateID:     operateID,
+				UserID:        userId,
+				UserType:      userType,
+				Type:          req.Type,
+				Money:         req.Money,
+				Status:        model.StatusWithdrawing,
+				OperateType:   model.OperateTypeWithdraw,
+				TransactionID: *resp.TransferBillNo,
+				PackageInfo:   *resp.PackageInfo,
+			}
+			err = tx.Create(&operateData).Error
+			if err != nil {
+				global.Lg.Error("提现失败，保存失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
+				return err
+			}
+
+			if req.Type == model.TypeDeposit {
+				err = tx.Model(&model.Coaches{}).
+					Where("coach_id = ?", userId).
+					UpdateColumn("deposit", gorm.Expr("deposit - ?", req.Money)).Error
+			} else {
+				err = tx.Model(&model.Coaches{}).
+					Where("coach_id = ?", userId).
+					UpdateColumn("balance", gorm.Expr("balance - ?", req.Money)).Error
+			}
+			if err != nil {
+				global.Lg.Error("提现失败，更新教练信息失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+
+	} else if userType == enum.UserTypeClub {
 		club, err := QueryClubInfoByClubId(userId)
 		if err != nil {
 			return nil, enum.NewErr(enum.ClubExitErr, "俱乐部不存在")
 		}
 		if club.FrozenDeposit == 1 {
 			return nil, enum.NewErr(enum.ClubFrozenDepositErr, "保证金被冻结")
-		}
-		if req.Type == model.TypeDeposit { //提现保证金
-			if club.Deposit-op.Money-courseMoney < req.Money {
-				return nil, enum.NewErr(enum.ClubDepositNotEnoughErr, "保证金不足")
-			}
-		} else if req.Type == model.TypeBalance { //提现余额
-			if club.Balance-op.Money < req.Money {
-				return nil, enum.NewErr(enum.ClubBalanceNotEnoughErr, "余额不足")
-			}
 		}
 		userName = club.Manager
 		uid = club.Uid
@@ -114,61 +182,111 @@ func MoneyOperateWithdraw(c *gin.Context, req *forms.MoneyOperateWithdrawRequest
 			return nil, err
 		}
 		openid = user.OpenId
+		if openid == "" {
+			return nil, enum.NewErr(enum.ParamErr, "请先绑定微信账号")
+		}
 		appid = global.Config.ClubMiniProgram.AppId
+
+		operateID := GenerateId("M")
+		err = global.DB.Transaction(func(tx *gorm.DB) error {
+			if req.Type == model.TypeDeposit {
+				err = tx.Model(&model.Clubs{}).
+					Select("deposit").
+					Where("club_id = ? AND deposit >= ?", userId, op.Money+courseMoney+req.Money).
+					First(&model.Clubs{}).Error
+				if err != nil {
+					return enum.NewErr(enum.ClubDepositNotEnoughErr, "保证金不足")
+				}
+			} else {
+				err = tx.Model(&model.Clubs{}).
+					Select("balance").
+					Where("club_id = ? AND balance >= ?", userId, op.Money+req.Money).
+					First(&model.Clubs{}).Error
+				if err != nil {
+					return enum.NewErr(enum.ClubBalanceNotEnoughErr, "余额不足")
+				}
+			}
+
+			resp, err = Createtransferbill(c, operateID, appid, openid, userName, req.Money)
+			if err != nil {
+				global.Lg.Error("Createtransferbill err", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp))
+				return err
+			}
+
+			record := model.MoneyRecords{
+				UserID:        userId,
+				UserType:      userType,
+				Money:         req.Money,
+				MoneyType:     getWithdrawMoneyType(userType, req.Type),
+				IncomeType:    model.IncomeTypePay,
+				RelationType:  model.RelationTypeWithdraw,
+				RelationID:    operateID,
+				OrderCourseID: "",
+			}
+			err = NewMoneyRecordsDao(c, tx).Create(c, &record, tx)
+			if err != nil {
+				global.Lg.Error("提现失败，保存资金记录失败", zap.Error(err), zap.Any("req", req))
+				return err
+			}
+
+			operateData := model.MoneyOperate{
+				OperateID:     operateID,
+				UserID:        userId,
+				UserType:      userType,
+				Type:          req.Type,
+				Money:         req.Money,
+				Status:        model.StatusWithdrawing,
+				OperateType:   model.OperateTypeWithdraw,
+				TransactionID: *resp.TransferBillNo,
+				PackageInfo:   *resp.PackageInfo,
+			}
+			err = tx.Create(&operateData).Error
+			if err != nil {
+				global.Lg.Error("提现失败，保存失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
+				return err
+			}
+
+			if req.Type == model.TypeDeposit {
+				err = tx.Model(&model.Clubs{}).
+					Where("club_id = ?", userId).
+					UpdateColumn("deposit", gorm.Expr("deposit - ?", req.Money)).Error
+			} else {
+				err = tx.Model(&model.Clubs{}).
+					Where("club_id = ?", userId).
+					UpdateColumn("balance", gorm.Expr("balance - ?", req.Money)).Error
+			}
+			if err != nil {
+				global.Lg.Error("提现失败，俱乐部信息更新失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	operateID := GenerateId("M")
-	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		//TODO 微信支付商家打钱给用户
-		resp, err = Createtransferbill(c, operateID, appid, openid, userName, req.Money)
-		if err != nil {
-			global.Lg.Error("Createtransferbill err", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp))
-			return err
-		}
-		//创建提现操作记录
-		operateData := model.MoneyOperate{
-			OperateID:     operateID,
-			UserID:        userId,
-			UserType:      userType,
-			Type:          req.Type,
-			Money:         req.Money,
-			Status:        model.StatusWithdrawing,
-			OperateType:   model.OperateTypeWithdraw,
-			TransactionID: *resp.TransferBillNo,
-			PackageInfo:   *resp.PackageInfo,
-		}
-		err = global.DB.Create(&operateData).Error
-		if err != nil {
-			global.Lg.Error("提现失败, 保存失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
-			return err
-		}
-		updateData := map[string]interface{}{}
-		if userType == enum.UserTypeCoach { //教练
-			if req.Type == model.TypeDeposit { //提现保证金
-				updateData["deposit"] = gorm.Expr("deposit - ?", req.Money)
-			} else { //提现余额
-				updateData["balance"] = gorm.Expr("balance - ?", req.Money)
-			}
-			err = tx.Table("coaches").Where("coach_id = ?", userId).Updates(updateData).Error
-			if err != nil {
-				global.Lg.Error("提现失败, 更新教练信息失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
-				return err
-			}
-		} else {
-			if req.Type == model.TypeDeposit { //提现保证金
-				updateData["deposit"] = gorm.Expr("deposit - ?", req.Money)
-			} else { //提现余额
-				updateData["balance"] = gorm.Expr("balance - ?", req.Money)
-			}
-			err = tx.Table("clubs").Where("club_id = ?", userId).Updates(updateData).Error
-			if err != nil {
-				global.Lg.Error("提现失败, 俱乐部信息更新失败", zap.Error(err), zap.Any("req", req), zap.Any("resp", resp), zap.Any("operateData", operateData))
-				return err
-			}
-		}
-		return err
-	})
 	return resp, nil
+}
+
+// ... existing code ...
+
+// ... existing code ...
+// ... existing code ...
+
+func getWithdrawMoneyType(userType int, moneyType int) int {
+	if userType == enum.UserTypeCoach {
+		if moneyType == model.TypeDeposit {
+			return model.CoachPayDepositWithdraw
+		}
+		return model.CoachPayFundsWithdraw
+	}
+
+	if moneyType == model.TypeDeposit {
+		return model.ClubPayDepositWithdraw
+	}
+	return model.ClubPayFundsWithdraw
 }
 
 func Createtransferbill(ctx *gin.Context, outBillNo, appid, openid, userName string, transferAmount int64) (resp *transferbills.CreateTransferBillResponse, err error) {
@@ -340,7 +458,7 @@ func MoneyOperateRechargeCallback(c *gin.Context, r *http.Request) error {
 
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
 		//更新充值记录
-		err = global.DB.Model(&model.MoneyOperate{}).Where("operate_id = ?", *result.OutTradeNo).Updates(map[string]interface{}{
+		err = tx.Model(&model.MoneyOperate{}).Where("operate_id = ?", *result.OutTradeNo).Updates(map[string]interface{}{
 			"status":         model.StatusRecharged,
 			"transaction_id": *result.TransactionId,
 			"pay_time":       payTime,
@@ -492,10 +610,25 @@ func BillsCallback(plaintext string) (err error) {
 		//提现失败，需要将钱退回去
 		money := moneyOperate.Money
 		userId := moneyOperate.UserID
+		failRecord := model.MoneyRecords{
+			MoneyID:       GenerateId("ZJ"),
+			Money:         money,
+			IncomeType:    model.IncomeTypePay,
+			RelationType:  model.RelationTypeWithdraw,
+			UserType:      moneyOperate.UserType,
+			UserID:        userId,
+			RelationID:    moneyOperate.OperateID,
+			OrderCourseID: "",
+			MoneyDesc:     "提现失败退回",
+			Remark:        "微信打款失败，资金退回账户",
+		}
+
 		if moneyOperate.UserType == enum.UserTypeCoach { //教练
 			if moneyOperate.Type == model.TypeDeposit { //提现保证金
+				failRecord.MoneyType = model.CoachPayDepositWithdrawRefund
 				updateData["deposit"] = gorm.Expr("deposit + ?", money)
 			} else { //提现余额
+				failRecord.MoneyType = model.CoachPayBalanceWithdrawRefund
 				updateData["balance"] = gorm.Expr("balance + ?", money)
 			}
 			err = tx.Table("coaches").Where("coach_id = ?", userId).Updates(updateData).Error
@@ -505,8 +638,10 @@ func BillsCallback(plaintext string) (err error) {
 			}
 		} else {
 			if moneyOperate.Type == model.TypeDeposit { //提现保证金
+				failRecord.MoneyType = model.ClubPayDepositWithdrawRefund
 				updateData["deposit"] = gorm.Expr("deposit + ?", money)
 			} else { //提现余额
+				failRecord.MoneyType = model.ClubPayBalanceWithdrawRefund
 				updateData["balance"] = gorm.Expr("balance + ?", money)
 			}
 			err = tx.Table("clubs").Where("club_id = ?", userId).Updates(updateData).Error
@@ -514,6 +649,12 @@ func BillsCallback(plaintext string) (err error) {
 				global.Lg.Error("提现失败, 俱乐部信息更新失败", zap.Error(err), zap.Any("moneyOperate", moneyOperate))
 				return err
 			}
+		}
+		// 创建提现失败的资金流水记录
+		err = tx.Model(&model.MoneyRecords{}).Create(&failRecord).Error
+		if err != nil {
+			global.Lg.Error("创建提现失败资金流水失败", zap.Error(err), zap.Any("failRecord", failRecord))
+			return err
 		}
 		return nil
 	})

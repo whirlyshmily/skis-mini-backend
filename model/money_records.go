@@ -75,6 +75,8 @@ const (
 	CoachPayFinishCToClubService                    = 3027 //完成俱乐部课程平台服务费
 	CoachPayDepositWithdraw                         = 3033 //保证金提取
 	CoachPayFundsWithdraw                           = 3035 //钱包资金提取 收取资金
+	CoachPayDepositWithdrawRefund                   = 3038 //保证金提现失败退回
+	CoachPayBalanceWithdrawRefund                   = 3039 //余额提现失败退回
 	CoachPayAdminPartRefundService                  = 3040 //后台退课（部分退款，无转单）平台服务费（教练收到退款）
 	CoachPayAdminPartRefundToTranferBySellerService = 3043 //后台退课（部分退款，转单）平台服务费（原教练收到退款）
 	CoachPayAdminPartRefundToTranferService         = 3045 //后台退课（部分退款，转单）平台服务费（接单教练收到退款）
@@ -108,6 +110,8 @@ const (
 	ClubPayAdminPartRefundToClubYesCoachService = 5051 //后台退课（俱乐部，部分退款，有教练接课）平台服务费（俱乐部收到退款）
 	ClubPayDepositWithdraw                      = 5034 //保证金提取
 	ClubPayFundsWithdraw                        = 5036 //提取资金
+	ClubPayDepositWithdrawRefund                = 5039 //保证金提现失败退回
+	ClubPayBalanceWithdrawRefund                = 5040 //余额提现失败退回
 	//ClubPayDepositRecharge                      = 5032 //俱乐部充值保证金
 
 	// 俱乐部收入类型（6）
@@ -157,6 +161,10 @@ var UserMoneyTypeStr = map[int]string{
 	ClubPayDepositWithdraw:                          "提取保证金",
 	CoachPayFundsWithdraw:                           "提取钱包资金",
 	ClubPayFundsWithdraw:                            "提取钱包资金",
+	CoachPayDepositWithdrawRefund:                   "保证金提现失败退回",
+	CoachPayBalanceWithdrawRefund:                   "余额提现失败退回",
+	ClubPayDepositWithdrawRefund:                    "保证金提现失败退回",
+	ClubPayBalanceWithdrawRefund:                    "余额提现失败退回",
 	UserIncomeAdminRefund:                           "客服系统全额退单退款",
 	UserIncomeAdminPartRefund:                       "客服系统协商退单退款",
 	CoachIncomeAdminPartRefund:                      "客服系统协商退单退款",
@@ -215,6 +223,10 @@ var UserMoneyTypeRemark = map[int]string{
 	ClubPayFundsWithdraw:                            "E滑微信账户至用户微信支付",
 	UserIncomeAdminRefund:                           "E滑微信账户至用户微信支付",
 	UserIncomeAdminPartRefund:                       "E滑微信账户至用户微信支付",
+	CoachPayDepositWithdrawRefund:                   "平台内部流转（提现失败退回）",
+	CoachPayBalanceWithdrawRefund:                   "平台内部流转（提现失败退回）",
+	ClubPayDepositWithdrawRefund:                    "平台内部流转（提现失败退回）",
+	ClubPayBalanceWithdrawRefund:                    "平台内部流转（提现失败退回）",
 	CoachIncomeAdminPartRefund:                      "平台内部流转",
 	CoachPayAdminPartRefundService:                  "平台内部流转",
 	UserIncomeAdminPartRefundToTranfer:              "E滑微信账户至用户微信支付",

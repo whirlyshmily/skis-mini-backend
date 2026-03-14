@@ -74,42 +74,46 @@ func OrderRefund(ctx context.Context, uid, orderId string) error {
 		return enum.NewErr(enum.OrderCourseRefundExistErr, "订单已申请退款")
 	}
 
+	refundId := GenerateId("RF")
+	refundStatus := "PROCESSING"
+	orderStatus := enum.OrderStatusRefundProcessing
+	//插入订单退款信息
+	refundOrder = &model.OrdersRefund{
+		UserId:       uid,
+		UserType:     model.UserTypeUser,
+		OrderId:      order.OrderID,
+		RefundId:     refundId,
+		RefundMoney:  refundMoney.Money,
+		RefundPoints: refundMoney.UsedPoints,
+		RefundType:   model.RefundTypeUser,
+	}
+	if refundMoney.Money > 0 {
+
+	} else {
+		refundStatus = "SUCCESS"
+		refundTime := time.Now()
+		refundOrder.RefundTime = &refundTime
+		refundOrder.Remark = "无需退款，只退积分"
+		orderStatus = enum.OrderStatusRefundSuccess
+	}
+
+	//插入订单退款信息
+	refundOrder.Status = refundStatus
+	if err = CreateOrdersRefund(ctx, global.DB, refundOrder); err != nil {
+		global.Lg.Error("插入订单退款信息失败", zap.Error(err))
+		return err
+	}
+
 	//启动事务处理退款逻辑
 	if err = global.DB.Transaction(func(tx *gorm.DB) error {
-		refundId := GenerateId("RF")
-		refundStatus := "PROCESSING"
-		orderStatus := enum.OrderStatusRefundProcessing
-		//插入订单退款信息
-		refundOrder = &model.OrdersRefund{
-			UserId:       uid,
-			UserType:     model.UserTypeUser,
-			OrderId:      order.OrderID,
-			RefundId:     refundId,
-			RefundMoney:  refundMoney.Money,
-			RefundPoints: refundMoney.UsedPoints,
-			RefundType:   model.RefundTypeUser,
-		}
-		if refundMoney.Money > 0 {
-
-		} else {
-			refundStatus = "SUCCESS"
-			refundTime := time.Now()
-			refundOrder.RefundTime = &refundTime
-			refundOrder.Remark = "无需退款，只退积分"
-			orderStatus = enum.OrderStatusRefundSuccess
-		}
-
-		tx.Model(model.Orders{}).Where("order_id = ?", orderId).Updates(
+		err = tx.Model(model.Orders{}).Where("order_id = ?", orderId).Updates(
 			map[string]interface{}{
 				"status": orderStatus,
-			})
-		//插入订单退款信息
-		refundOrder.Status = refundStatus
-		if err = CreateOrdersRefund(ctx, tx, refundOrder); err != nil {
-			global.Lg.Error("插入订单退款信息失败", zap.Error(err))
+			}).Error
+		if err != nil {
+			global.Lg.Error("更新订单状态失败", zap.Error(err))
 			return err
 		}
-
 		//不需要退钱，只退积分，则直接更新订单状态为退款成功，并释放教练时间和用户积分
 		if orderStatus == enum.OrderStatusRefundSuccess {
 			err = ReleaseCoachTime(ctx, order, tx)
