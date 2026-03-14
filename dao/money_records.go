@@ -67,9 +67,9 @@ func (d *MoneyRecordsDao) Create(ctx context.Context, obj *model.MoneyRecords, t
 	//资金变动记录（保证金相关）
 	if obj.RelationType == model.RelationTypeDeposit {
 		if obj.IncomeType == model.IncomeTypeIncome {
-			updateData["deposit"] = gorm.Expr("deposit - ?", obj.Money)
+			updateData["deposit"] = gorm.Expr("deposit + ?", obj.Money) // 收入：保证金增加
 		} else if obj.IncomeType == model.IncomeTypePay {
-			updateData["deposit"] = gorm.Expr("deposit + ?", obj.Money)
+			updateData["deposit"] = gorm.Expr("deposit - ?", obj.Money) // 支出：保证金减少
 		}
 	}
 
