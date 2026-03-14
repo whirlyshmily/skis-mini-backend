@@ -27,7 +27,20 @@ func (m OrdersCoursesJob) Run() {
 func (m OrdersCoursesJob) processTeachStateTenToZero(c context.Context) {
 	// 查询 teach_state=10 的订单课程
 	today := time.Now().Format("2006-01-02")
-	err := global.DB.Model(model.OrdersCourses{}).
+
+	//将今天之前的待核销的课程状态改为已上课
+	err := global.DB.Table("orders_courses").
+		Where("teach_start_time < ?", today).
+		Where(" is_check = ? and state = 0", model.IsCheckNo).
+		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitCheck}).
+		Updates(map[string]interface{}{
+			"teach_state": model.TeachStateAlreadyClass,
+		}).Error
+	if err != nil {
+		global.Lg.Error("查询 teach_state=10 的订单课程失败", zap.Error(err))
+	}
+
+	err = global.DB.Model(model.OrdersCourses{}).
 		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitCoachConfirmUser, model.TeachStateWaitClubConfirm}).
 		Where("teach_start_time < ?", today).
 		Update("teach_state", model.TeachStateWaitAppointment).Error
@@ -45,7 +58,7 @@ func (m OrdersCoursesJob) processTeachStateHundredToThreeHundred(c context.Conte
 
 	// 查询 teach_state=100 且 teach_start_time 在明天之前的订单课程
 	err := global.DB.Model(model.OrdersCourses{}).
-		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitClass, model.TeachStateWaitCoachClass}).
+		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitClass, model.TeachStateWaitCoachClass, model.TeachStateWaitClassTransfer}).
 		Where("teach_start_time < ?", tomorrow).
 		Update("teach_state", model.TeachStateWaitCheck).Error
 

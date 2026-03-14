@@ -7,33 +7,12 @@ import (
 	"skis-admin-backend/enum"
 	"skis-admin-backend/global"
 	"skis-admin-backend/model"
-	"time"
 )
 
 type VerifyCourseJob struct {
 }
 
 func (m VerifyCourseJob) Run() {
-
-	//将今天和今天之前的课程状态改为待核销
-	today := time.Now().Format("2006-01-02")
-	global.DB.Table("orders_courses").
-		Where("teach_start_time < ?", today+" 23:59:59").
-		Where(" is_check = ? and state = 0", model.IsCheckNo).
-		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitCoachClass, model.TeachStateWaitClass, model.TeachStateWaitClassTransfer}).
-		Updates(map[string]interface{}{
-			"teach_state": model.TeachStateWaitCheck,
-		})
-
-	//将今天之前的待核销的课程状态改为已上课
-	global.DB.Table("orders_courses").
-		Where("teach_start_time < ?", today).
-		Where(" is_check = ? and state = 0", model.IsCheckNo).
-		Where("teach_state in ?", []model.TeachState{model.TeachStateWaitCheck}).
-		Updates(map[string]interface{}{
-			"teach_state": model.TeachStateAlreadyClass,
-		})
-
 	var data []model.OrdersCourses
 	global.DB.Model(model.OrdersCourses{}).
 		Where("teach_start_time between now() - interval 10 day and now() - interval 7 day").
