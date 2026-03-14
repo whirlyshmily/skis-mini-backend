@@ -113,6 +113,9 @@ const (
 	//打包课
 	OrderTransferErr = 2200 //订单转包课失败
 
+	//并发冲突
+	OptimisticLockErr = 2300 //并发操作冲突，请刷新后重试
+
 	//第三方错误码错
 	WeChatLoginErr   = 10001 //微信登录失败
 	WeChatDecryptErr = 10002 //微信解密失败密失败

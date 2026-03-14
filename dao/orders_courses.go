@@ -188,11 +188,9 @@ func (d *OrdersCoursesDao) AppointmentCourse(c *gin.Context, req *forms.Appointm
 	}
 	//下面预约课程
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", req.OrderCourseId).
-			Updates(upData).Error
-
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, req.OrderCourseId, model.TeachStateWaitAppointment, upData)
 		if err != nil {
-			global.Lg.Error("OrdersCoursesDao: AppointmentCourse: %w", zap.Error(err), zap.Any("req", req))
 			return err
 		}
 		err = SRTOrderCourses(tx, ids, orderCourse.OrderCourseID, 0)
@@ -397,19 +395,18 @@ func CancelCoachCourseSql(c context.Context, tx *gorm.DB, order model.Orders, or
 	if inspectorate.Operate == model.OperateUserCancelCourse {
 		teachState = model.TeachStateCancel
 	}
-	err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-		Updates(map[string]interface{}{
-			"teach_start_time":  gorm.Expr("NULL"),
-			"teach_state":       teachState,
-			"teach_buffer_time": 0,
-			"teach_time_ids":    model.JSONIntArray{},
-			"club_time_ids":     model.JSONIntArray{},
-			"ski_resorts_id":    0,
-			"teach_coach_id":    order.UserID, //可能转移过订单，这里要更新，把教学教练改回卖课教练ID
-		}).Error
 
+	// 使用乐观锁安全更新状态
+	err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, orderCourse.TeachState, map[string]interface{}{
+		"teach_start_time":  gorm.Expr("NULL"),
+		"teach_state":       teachState,
+		"teach_buffer_time": 0,
+		"teach_time_ids":    model.JSONIntArray{},
+		"club_time_ids":     model.JSONIntArray{},
+		"ski_resorts_id":    0,
+		"teach_coach_id":    order.UserID, //可能转移过订单，这里要更新，把教学教练改回卖课教练ID
+	})
 	if err != nil {
-		global.Lg.Error("OrdersCoursesDao: 取消预约: %w", zap.Error(err), zap.Any("orderCourse", orderCourse))
 		return err
 	}
 
@@ -484,20 +481,17 @@ func CancelClubCourseSql(c context.Context, tx *gorm.DB, order model.Orders, ord
 	if inspectorate.Operate == model.OperateUserCancelCourse {
 		teachState = model.TeachStateCancel
 	}
-	//取消预约
-	err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-		Updates(map[string]interface{}{
-			"teach_start_time":  gorm.Expr("NULL"),
-			"teach_state":       teachState,
-			"teach_buffer_time": 0,
-			"teach_time_ids":    model.JSONIntArray{},
-			"club_time_ids":     model.JSONIntArray{},
-			"ski_resorts_id":    0,
-			"teach_coach_id":    "",
-		}).Error
-
+	// 使用乐观锁安全更新状态
+	err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, orderCourse.TeachState, map[string]interface{}{
+		"teach_start_time":  gorm.Expr("NULL"),
+		"teach_state":       teachState,
+		"teach_buffer_time": 0,
+		"teach_time_ids":    model.JSONIntArray{},
+		"club_time_ids":     model.JSONIntArray{},
+		"ski_resorts_id":    0,
+		"teach_coach_id":    "",
+	})
 	if err != nil {
-		global.Lg.Error("OrdersCoursesDao: 取消预约: %w", zap.Error(err), zap.Any("orderCourse", orderCourse))
 		return err
 	}
 
@@ -632,14 +626,14 @@ func ReviewCoachTeachTime(c *gin.Context, orderCourse *model.OrdersCourses, orde
 			if err != nil {
 				return enum.NewErr(enum.OrdersCoursesExitErr, "插入记录失败")
 			}
-			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
-				Updates(map[string]interface{}{
-					"teach_start_time": ocsData.TeachStartTime,
-					"teach_state":      teachState,
-					"teach_time_ids":   string(idsStr),
-				}).Error
+			// 使用乐观锁安全更新状态
+			err = SafeUpdateTeachState(tx, orderCourseId, orderCourse.TeachState, map[string]interface{}{
+				"teach_start_time": ocsData.TeachStartTime,
+				"teach_state":      teachState,
+				"teach_time_ids":   string(idsStr),
+			})
 			if err != nil {
-				return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改时间失败")
+				return err
 			}
 			//同意教练修改的课程时间，那就要把之前锁定的时间释放掉
 			err = SRTOrderCourses(tx, orderCourse.TeachTimeIDs, orderCourseId, 1)
@@ -685,12 +679,12 @@ func UserDisAgreeCoachTeachTimeSql(c context.Context, orderCourse model.OrdersCo
 			return enum.NewErr(enum.OrdersCoursesExitErr, "插入记录失败")
 		}
 
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-			Updates(map[string]interface{}{
-				"teach_state": teachState,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, orderCourse.TeachState, map[string]interface{}{
+			"teach_state": teachState,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改时间失败")
+			return err
 		}
 		//拒绝教练修改的课程时间，那就要把之前锁定的时间释放掉
 		err = SRTOrderCourses(tx, ocs.TeachTimeIDs, orderCourse.OrderCourseID, 1)
@@ -769,10 +763,10 @@ func ReviewClubTeachTime(c *gin.Context, orderCourse *model.OrdersCourses, order
 				upOrdersCourses["teach_time_ids"] = string(idsStr)
 			}
 
-			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
-				Updates(upOrdersCourses).Error
+			// 使用乐观锁安全更新状态
+			err = SafeUpdateTeachState(tx, orderCourseId, orderCourse.TeachState, upOrdersCourses)
 			if err != nil {
-				return enum.NewErr(enum.OrdersCoursesExitErr, "修改课程时间失败")
+				return err
 			}
 
 			//同意俱乐部修改的课程时间，那就要把之前锁定俱乐部和教练的时间释放掉
@@ -809,13 +803,12 @@ func UserDisAgreeClubTeachTimeSql(c context.Context, orderCourse model.OrdersCou
 			return enum.NewErr(enum.OrdersCoursesExitErr, "插入记录失败")
 		}
 
-		upda := map[string]interface{}{
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, orderCourse.TeachState, map[string]interface{}{
 			"teach_state": model.TeachStateWaitClubConfirm,
-		}
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-			Updates(upda).Error
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "修改课程状态失败")
+			return err
 		}
 		//拒绝俱乐部和教练修改的课程时间，那就要把之前锁定的时间释放掉
 		err = SRTOrderCourses(tx, append(clubTimeIds, []int64(coachTimeIds)...), orderCourse.OrderCourseID, 1)
@@ -863,13 +856,12 @@ func ReviewCoachTransferOrder(c *gin.Context, req *forms.ReviewCoachTransferOrde
 			if err != nil {
 				return enum.NewErr(enum.OrdersCoursesExitErr, "插入记录失败")
 			}
-			//同意教练转单，那课程状态改为待教练转单
-			err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", req.OrderCourseId).
-				Updates(map[string]interface{}{
-					"teach_state": model.TeachStateWaitCoachTransfer,
-				}).Error
+			// 使用乐观锁安全更新状态
+			err = SafeUpdateTeachState(tx, req.OrderCourseId, model.TeachStateWaitUserConfirmTransfer, map[string]interface{}{
+				"teach_state": model.TeachStateWaitCoachTransfer,
+			})
 			if err != nil {
-				return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")
+				return err
 			}
 			err = tx.Model(model.OrdersCoursesState{}).Where("order_course_id = ? and operate=? and process=?",
 				orderCourse.OrderCourseID, model.OperateCoachTransferCourse, model.ProcessNo).
@@ -899,13 +891,12 @@ func CancelCoachTransferOrderSql(c context.Context, orderCourse model.OrdersCour
 		if err != nil {
 			return enum.NewErr(enum.OrdersCoursesExitErr, "插入记录失败")
 		}
-		//用户不同意教练转单，就把课程状态改为待上课
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-			Updates(map[string]interface{}{
-				"teach_state": model.TeachStateWaitClass,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, model.TeachStateWaitUserConfirmTransfer, map[string]interface{}{
+			"teach_state": model.TeachStateWaitClass,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")
+			return err
 		}
 		err = tx.Model(model.OrdersCoursesState{}).Where("order_course_id = ? and operate=? and process=?",
 			orderCourse.OrderCourseID, model.OperateCoachTransferCourse, model.ProcessNo).

@@ -18,13 +18,13 @@ func CompleteCourseSplitMoney(c context.Context, orderCourse model.OrdersCourses
 		return err
 	}
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourse.OrderCourseID).
-			Updates(map[string]interface{}{
-				"teach_state": model.TeachStateFinish,
-				"is_check":    model.IsCheckYes,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourse.OrderCourseID, orderCourse.TeachState, map[string]interface{}{
+			"teach_state": model.TeachStateFinish,
+			"is_check":    model.IsCheckYes,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "核销失败")
+			return err
 		}
 
 		err = tx.Model(model.OrdersCoursesState{}).Create(&insrtocsData).Error

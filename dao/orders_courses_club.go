@@ -112,12 +112,12 @@ func ClubChangeTeachTime(c *gin.Context, orderCourseId string, req *forms.ClubCh
 	//检测时间是否冲突  END
 
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
-			Updates(map[string]interface{}{
-				"teach_state": model.TeachStateWaitUserConfirmClubTime,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourseId, orderCourse.TeachState, map[string]interface{}{
+			"teach_state": model.TeachStateWaitUserConfirmClubTime,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")
+			return err
 		}
 
 		timeIds := clubTimeIds
@@ -236,13 +236,13 @@ func ClubAppointmentCourse(c *gin.Context, orderCourseId string, req *forms.Club
 		return enum.NewErr(enum.OrdersCoursesExitErr, "教练时间冲突，请重新预约")
 	}
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
-			Updates(map[string]interface{}{
-				"teach_state":    model.TeachStateWaitCoachConfirmClub,
-				"teach_coach_id": coach.CoachId,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourseId, model.TeachStateWaitClubConfirm, map[string]interface{}{
+			"teach_state":    model.TeachStateWaitCoachConfirmClub,
+			"teach_coach_id": coach.CoachId,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")
+			return err
 		}
 		err = SRTOrderCourses(tx, ids, orderCourse.OrderCourseID, 0)
 		if err != nil {
@@ -350,13 +350,13 @@ func ClubReplaceCoachCourse(c *gin.Context, orderCourseId string, req *forms.Clu
 		return enum.NewErr(enum.OrdersCoursesExitErr, "教练时间冲突，请重新预约")
 	}
 	err = global.DB.Transaction(func(tx *gorm.DB) error {
-		err = tx.Model(model.OrdersCourses{}).Where("order_course_id = ?", orderCourseId).
-			Updates(map[string]interface{}{
-				"teach_state":    model.TeachStateWaitCoachConfirmTransfer,
-				"teach_coach_id": req.CoachId,
-			}).Error
+		// 使用乐观锁安全更新状态
+		err = SafeUpdateTeachState(tx, orderCourseId, model.TeachStateCoachApplyTransfer, map[string]interface{}{
+			"teach_state":    model.TeachStateWaitCoachConfirmTransfer,
+			"teach_coach_id": req.CoachId,
+		})
 		if err != nil {
-			return enum.NewErr(enum.OrdersCoursesExitErr, "课程修改状态失败")
+			return err
 		}
 		err = SRTOrderCourses(tx, ids, orderCourseId, 0)
 		if err != nil {

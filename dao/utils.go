@@ -4,7 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"skis-admin-backend/enum"
+	"skis-admin-backend/model"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func GenerateId(prefix string) string {
@@ -75,4 +79,28 @@ func GetStartTime(startTime string) string {
 
 func GetEndTime(endTime string) string {
 	return endTime + " 23:59:59"
+}
+
+// SafeUpdateTeachState 安全更新课程教学状态（带乐观锁）
+// expectedState: 期望的当前状态，只有当数据库中的状态等于此值时才允许更新
+// 返回值: 如果 RowsAffected == 0 表示状态已被其他操作修改，发生了并发冲突
+func SafeUpdateTeachState(tx *gorm.DB, orderCourseId string, expectedState model.TeachState, updates map[string]interface{}) error {
+	result := tx.Model(model.OrdersCourses{}).
+		Where("order_course_id = ? AND teach_state = ?", orderCourseId, expectedState).
+		Updates(updates)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return enum.NewErr(enum.OptimisticLockErr, "课程状态已变更，请刷新后重试")
+	}
+	return nil
+}
+
+// SafeUpdateTeachStateWithState 安全更新课程教学状态并设置新状态（带乐观锁）
+func SafeUpdateTeachStateWithState(tx *gorm.DB, orderCourseId string, expectedState, newState model.TeachState) error {
+	return SafeUpdateTeachState(tx, orderCourseId, expectedState, map[string]interface{}{
+		"teach_state": newState,
+	})
 }
