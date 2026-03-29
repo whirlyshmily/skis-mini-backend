@@ -304,6 +304,7 @@ func BeforeCoachCancelOrderCourses(c *gin.Context) {
 		response.Err(c, enum.NewErr(enum.UserTypeError, "用户类型错误"))
 		return
 	}
+
 	resp, err := dao.BeforeCoachCancelOrderCourses(c, orderCourseId)
 	if err != nil {
 		response.Err(c, err)
