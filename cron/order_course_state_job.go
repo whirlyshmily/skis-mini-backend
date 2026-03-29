@@ -21,6 +21,7 @@ func (m OrdersCoursesStateJob) Run() {
 		Where("operate in ? and process = ?", []model.TeachState{model.OperateUserAgreeCoachTransferCourse, model.OperateCoachApplyTransferCourse}, model.ProcessNo).
 		Find(&data48)
 
+	//48小时取消
 	for _, ocs := range data48 {
 		_, orderCourse, err := dao.GetOrderCourses(ocs.OrderCourseID)
 		if err != nil {
@@ -372,7 +373,7 @@ func cronCancelCoachTransferOrder(c context.Context, orderCourse model.OrdersCou
 	}
 	err = global.DB.Model(model.OrdersCourses{}).Where("order_course_id = ? and state=0", orderCourse.OrderCourseID).
 		Updates(map[string]interface{}{
-			"teach_state": model.TeachStateWaitClass,
+			"teach_state": model.TeachStateWaitCoachTransfer,
 		}).Error
 	return
 }

@@ -395,6 +395,9 @@ func BeforeCoachCancelOrderCourses(c *gin.Context, orderCourseId string) (resp f
 	resp.Liability = 1
 	if cancelNum >= model.OrderCourseCoachCancelNumber {
 		resp.Liability = 3
+		resp.LiabilityRemainingCount = 0
+	} else {
+		resp.LiabilityRemainingCount = int(model.OrderCourseCoachCancelNumber - cancelNum)
 	}
 	return resp, nil
 }

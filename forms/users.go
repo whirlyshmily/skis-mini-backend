@@ -73,9 +73,10 @@ type AppointmentCourseRequest struct {
 }
 
 type BeforeCancelAppointmentCourseResp struct {
-	Liability    int   `json:"is_liability"`  // 是否是责任（1：无责、2：有责、3：无责次数用完）
-	RefundMoney  int64 `json:"refund_money"`  // 退款金额
-	RefundPoints int64 `json:"refund_points"` // 退款积分
+	Liability               int   `json:"is_liability"`              // 是否是责任（1：无责、2：有责、3：无责次数用完）
+	LiabilityRemainingCount int   `json:"liability_remaining_count"` // 无责次数
+	RefundMoney             int64 `json:"refund_money"`              // 退款金额
+	RefundPoints            int64 `json:"refund_points"`             // 退款积分
 }
 
 type CancelAppointmentCourseRequest struct {
