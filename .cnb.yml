@@ -1,4 +1,4 @@
-master:
+main:
   push:
     - stages:
       - name: update code
